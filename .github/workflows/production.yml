@@ -1,0 +1,91 @@
+name: Production Branch Workflow
+
+on:
+  push:
+    branches: [ "production" ]
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/**'
+
+jobs:
+  reusable-workflow:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      sonar_scan: true
+      jacoco_report: true
+      security_analysis: true
+      production_build: true
+      build_frontend: true
+    secrets: inherit
+  
+  deploy-to-production:
+    needs: reusable-workflow
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      version_tag: ${{ steps.create_tag.outputs.tag }}
+    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+      
+      # Vos étapes de déploiement en production
+      # Par exemple: création d'images Docker, déploiement sur Kubernetes, etc.
+      
+      - name: Generate version tag
+        id: create_tag
+        run: |
+          # Générer un tag basé sur la date et l'heure
+          TAG_DATE=$(date +'%Y.%m.%d')
+          BUILD_NUMBER=${{ github.run_number }}
+          VERSION_TAG="v${TAG_DATE}-${BUILD_NUMBER}"
+          
+          # Configure Git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Créer et pousser le tag
+          git tag -a "${VERSION_TAG}" -m "Release ${VERSION_TAG} - Automated release by GitHub Actions"
+          git push origin "${VERSION_TAG}"
+          
+          # Enregistrer le tag pour l'étape suivante
+          echo "tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+          echo "::notice::Created new tag: ${VERSION_TAG}"
+  
+  create-release:
+    needs: deploy-to-production
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.deploy-to-production.outputs.version_tag }}
+          name: Release ${{ needs.deploy-to-production.outputs.version_tag }}
+          body: |
+            ## Release ${{ needs.deploy-to-production.outputs.version_tag }}
+            
+            Automatic production release from the production branch.
+            
+            ### Included changes:
+            ${{ github.event.head_commit.message }}
+          files: |
+            **/build/libs/*.jar
+          generate_release_notes: true 

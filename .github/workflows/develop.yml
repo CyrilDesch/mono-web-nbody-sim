@@ -1,0 +1,35 @@
+name: Develop Branch Workflow
+
+on:
+  push:
+    branches: [ "development" ]
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/**'
+
+jobs:
+  reusable-workflow:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      sonar_scan: true
+      jacoco_report: true
+      build_frontend: true
+    secrets: inherit
+  
+  deploy-to-dev:
+    needs: reusable-workflow
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+      
+      # Vous pouvez ajouter ici des étapes pour déployer 
+      # dans votre environnement de développement
+      # Par exemple: déploiement sur un serveur de test, création d'images Docker, etc. 
