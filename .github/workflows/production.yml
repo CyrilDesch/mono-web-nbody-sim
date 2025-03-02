@@ -12,7 +12,6 @@ jobs:
   reusable-workflow:
     uses: ./.github/workflows/reusable.yml
     with:
-      sonar_scan: true
       jacoco_report: true
       security_analysis: true
       production_build: true
@@ -20,7 +19,7 @@ jobs:
     secrets: inherit
   
   deploy-to-production:
-    needs: reusable-workflow
+    needs: [reusable-workflow]
     runs-on: ubuntu-latest
     environment: production
     outputs:
@@ -33,12 +32,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-      
-      # Vos étapes de déploiement en production
-      # Par exemple: création d'images Docker, déploiement sur Kubernetes, etc.
       
       - name: Generate version tag
         id: create_tag
@@ -70,7 +66,7 @@ jobs:
           fetch-depth: 0
       
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-artifacts
       

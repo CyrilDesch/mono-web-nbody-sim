@@ -1,36 +1,76 @@
+// Add necessary dependencies for code quality tools
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
+    }
+}
+
 plugins {
     id 'java'
     id 'io.quarkus'
+    id 'jacoco'
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.quarkus'
+    apply plugin: 'jacoco'
+
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.compilerArgs << '-parameters'
+    }
+
+    tasks.withType(Test).configureEach {
+        systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+    }
+
+    dependencies {
+        implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+        implementation 'io.quarkus:quarkus-arc'
+        testImplementation 'io.quarkus:quarkus-junit5'
+
+        // Lombok
+        implementation 'org.projectlombok:lombok:1.18.30'
+        annotationProcessor 'org.projectlombok:lombok:1.18.30'
+        testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+        // SLF4J
+        implementation 'org.slf4j:slf4j-api:2.0.9'
+        implementation 'org.slf4j:slf4j-simple:2.0.9'
+    }
+
+    jacoco {
+        toolVersion = "0.8.11"
+    }
+
+    jacocoTestReport {
+        reports {
+            xml.required = true
+            csv.required = true
+            html.required = true
+            html.outputLocation = layout.buildDirectory.dir('reports/jacoco/html')
+        }
+        dependsOn tasks.named('compileQuarkusGeneratedSourcesJava')
+    }
+
+    test {
+        finalizedBy jacocoTestReport
+    }
 }
 
-dependencies {
-    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
-    implementation 'io.quarkus:quarkus-websockets'
-    implementation 'io.quarkus:quarkus-arc'
-    testImplementation 'io.quarkus:quarkus-junit5'
-}
-
-group 'org.cyrildeschamps'
-version '1.0.0-SNAPSHOT'
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
-test {
-    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
-}
-compileJava {
-    options.encoding = 'UTF-8'
-    options.compilerArgs << '-parameters'
-}
-
-compileTestJava {
-    options.encoding = 'UTF-8'
-}
+project(':core') {}
+project(':gateway') {}

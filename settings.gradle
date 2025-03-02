@@ -6,6 +6,12 @@ pluginManagement {
     }
     plugins {
         id "${quarkusPluginId}" version "${quarkusPluginVersion}"
+        id 'org.sonarqube' version '4.4.1.3373'
     }
 }
 rootProject.name='n-body-simulation-back'
+System.setProperty("sonar.gradle.skipCompile", "true")
+
+// Inclusion des sous-projets
+include 'core'
+include 'gateway'

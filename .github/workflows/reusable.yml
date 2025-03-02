@@ -3,11 +3,6 @@ name: Reusable Workflow
 on:
   workflow_call:
     inputs:
-      sonar_scan:
-        description: 'Run SonarQube scan'
-        required: false
-        type: boolean
-        default: true
       jacoco_report:
         description: 'Generate JaCoCo report'
         required: false
@@ -51,29 +46,27 @@ jobs:
       - name: Build and Test
         run: ./gradlew build test
       
-      - name: SonarQube Scan
-        if: ${{ inputs.sonar_scan }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./gradlew sonarqube -Dsonar.projectKey=mono-web-nbody-sim -Dsonar.organization=your-organization -Dsonar.host.url=https://sonarcloud.io
-      
-      - name: Code Coverage
+      - name: Code Coverage with JaCoCo
         if: ${{ inputs.jacoco_report }}
         run: ./gradlew jacocoTestReport
       
-      - name: Security Analysis
-        if: ${{ inputs.security_analysis }}
-        run: ./gradlew dependencyCheckAnalyze
-      
+      - name: Generate Badge for Test Coverage
+        if: ${{ inputs.jacoco_report }}
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          generate-branches-badge: true
+          jacoco-csv-file: "**/build/reports/jacoco/test/jacocoTestReport.csv"
+          badges-directory: .github/badges
+          
       - name: Upload Code Coverage
         if: ${{ inputs.jacoco_report }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: code-coverage-report
           path: |
             **/build/reports/jacoco/
             **/build/reports/tests/
+            .github/badges/
 
   build-artifacts:
     needs: build-and-test
@@ -109,7 +102,7 @@ jobs:
           yarn build
       
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: |

@@ -1,8 +1,22 @@
-# n-body-simulation-back
+# N-Body Simulation
+
+![Build Status](https://github.com/CyrilDesch/mono-web-nbody-sim/actions/workflows/development.yml/badge.svg)
+![Coverage](.github/badges/jacoco.svg)
+![Branches](.github/badges/branches.svg)
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
 If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+
+## Quality Assurance
+
+This project uses several tools to ensure code quality:
+
+- **JaCoCo**: Test coverage analysis
+- **SpotBugs**: Static code analysis to find potential bugs
+- **GitHub Actions**: Continuous integration and deployment
+
+The badges at the top of this README show the current build status and code coverage.
 
 ## Running the application in dev mode
 
@@ -23,7 +37,7 @@ The application can be packaged using:
 ```
 
 It produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `build/quarkus-app/lib/` directory.
+Be aware that it's not an _über-jar_ as the dependencies are copied into the `build/quarkus-app/lib/` directory.
 
 The application is now runnable using `java -jar build/quarkus-app/quarkus-run.jar`.
 
