@@ -1,56 +1,86 @@
-import { ref } from "vue";
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 
-const WS_URL = "ws://localhost:8080/nbody";
+interface Body {
+  x: number;
+  y: number;
+  z: number;
+  blackHole: boolean;
+  mass: number;
+  vx: number;
+  vy: number;
+  vz: number;
+}
 
-// Variable qui stocke l'instance unique
-let instance: ReturnType<typeof createWebSocketInstance> | null = null;
+// Variables singleton partagées
+let ws: WebSocket | null = null;
+const bodies = ref<Body[]>([]);
+let connectionAttempts = 0;
+const maxAttempts = 5;
 
-function createWebSocketInstance(initialFPS: number) {
-  const bodies = ref([]);
-  const timestamp = ref(0);
-  let socket: WebSocket | null = null;
+function connect() {
+  if (ws?.readyState === WebSocket.OPEN) {
+    console.log('WebSocket already connected');
+    return;
+  }
 
-  const updateFPS = (fps: number) => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ fps, type: "fps" }));
-    } else {
-      console.warn("Impossible d'envoyer le FPS, WebSocket non connectée");
+  if (connectionAttempts >= maxAttempts) {
+    console.error('Max connection attempts reached');
+    return;
+  }
+
+  ws = new WebSocket('ws://localhost:8080/nbody');
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.bodies) {
+      bodies.value = data.bodies;
     }
   };
 
-  const connect = () => {
-    if (socket) return; // Prevent new connection if already connected
-    socket = new WebSocket(WS_URL);
-
-    socket.onopen = () => {
-      console.log("WebSocket connectée");
-      updateFPS(initialFPS); // Envoi du FPS initial lors de la connexion
-    };
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      timestamp.value = data.timestamp;
-      bodies.value = data.bodies;
-    };
-
-    socket.onclose = () => {
-      console.log("WebSocket déconnectée");
-      socket = null;
-    };
-
-    socket.onerror = (error) => console.error("WebSocket erreur:", error);
+  ws.onclose = () => {
+    console.log('WebSocket closed, attempting to reconnect...');
+    ws = null;
+    connectionAttempts++;
+    setTimeout(connect, 1000);
   };
 
-  // Establish connection when instance is created
-  connect();
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
 
-  return { bodies, timestamp, updateFPS };
+  ws.onopen = () => {
+    console.log('WebSocket connected');
+    connectionAttempts = 0;
+    sendMessage({ type: 'fps', fps: 60 });
+  };
 }
 
-export function useWebSocket(initialFPS: number = 60) {
-  // Single instance creation, even if multiple components import it
-  if (!instance) {
-    instance = createWebSocketInstance(initialFPS);
+function sendMessage(message: any) {
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(message));
+  } else {
+    console.warn('WebSocket is not open, message not sent:', message);
   }
-  return instance;
+}
+
+export function useWebSocket() {
+  onMounted(() => {
+    if (!ws) {
+      connect();
+    }
+  });
+
+  onBeforeUnmount(() => {
+    // Ne ferme la connexion que si c'est le dernier composant à utiliser le WebSocket
+    if (ws && document.querySelectorAll('[data-v-usewebsocket]').length <= 1) {
+      ws.close();
+      ws = null;
+      connectionAttempts = 0;
+    }
+  });
+
+  return {
+    sendMessage,
+    bodies
+  };
 }

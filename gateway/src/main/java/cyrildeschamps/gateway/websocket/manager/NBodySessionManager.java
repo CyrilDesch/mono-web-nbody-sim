@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.*;
 
 @Slf4j
@@ -20,6 +21,7 @@ public class NBodySessionManager {
 
     private final ConcurrentMap<Session, ScheduledFuture<?>> sessionTasks = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Random random = new Random();
 
     @Inject
     NBodyService nBodyService;
@@ -52,5 +54,44 @@ public class NBodySessionManager {
         if (future != null) {
             future.cancel(true);
         }
+    }
+
+    private float randomInRange(float range) {
+        return (random.nextFloat() * 2 - 1) * range;
+    }
+
+    /**
+     * Crée plusieurs corps dans la simulation avec des positions aléatoires
+     */
+    public void createBodies(int count, float range, boolean blackHole) {
+        float defaultVelocity = 2.0f;
+        float mass = blackHole ? 5e5f : 1.0f;
+
+        for (int i = 0; i < count; i++) {
+            nBodyService.createBody(
+                randomInRange(range),  // x
+                randomInRange(range),  // y
+                randomInRange(range),  // z
+                mass,
+                blackHole,
+                randomInRange(defaultVelocity),  // vx
+                randomInRange(defaultVelocity),  // vy
+                randomInRange(defaultVelocity)   // vz
+            );
+        }
+    }
+
+    /**
+     * Réinitialise la simulation à son état initial
+     */
+    public void resetSimulation() {
+        nBodyService.resetSimulation();
+    }
+
+    /**
+     * Supprime un corps de la simulation
+     */
+    public boolean deleteBody(int index) {
+        return nBodyService.deleteBody(index);
     }
 }

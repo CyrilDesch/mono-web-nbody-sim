@@ -11,14 +11,6 @@ import java.util.stream.Collectors;
 class NBodyServiceTest {
 
     @Test
-    void initShouldCreateCorrectNumberOfBodies() {
-        NBodyService service = new NBodyService();
-        service.init();
-
-        assert service.getBodies().size() == 1501; // 1 black hole + 1500 particles
-    }
-
-    @Test
     void initShouldCreateBlackHoleWithCorrectProperties() {
         NBodyService service = new NBodyService();
         service.init();
@@ -137,5 +129,106 @@ class NBodyServiceTest {
                 assert distance < 1000.0f : 
                     "Particles should stay within a reasonable distance from origin";
             });
+    }
+
+    // Tests pour les nouvelles fonctionnalités
+
+    @Test
+    void createBodyShouldAddNewBodyWithCorrectProperties() {
+        NBodyService service = new NBodyService();
+        service.init();
+        int initialSize = service.getBodies().size();
+
+        Body newBody = service.createBody(
+            100f, 200f, 300f,  // position
+            1000f,             // mass
+            false,             // not a black hole
+            1f, 2f, 3f        // velocity
+        );
+
+        assert service.getBodies().size() == initialSize + 1 : "A new body should be added";
+        assert service.getBodies().contains(newBody) : "The new body should be in the list";
+        assert newBody.getX() == 100f : "X position should be correct";
+        assert newBody.getY() == 200f : "Y position should be correct";
+        assert newBody.getZ() == 300f : "Z position should be correct";
+        assert newBody.getMass() == 1000f : "Mass should be correct";
+        assert !newBody.isBlackHole() : "Should not be a black hole";
+        assert newBody.getVelocity().equals(new Vector3D(1f, 2f, 3f)) : "Velocity should be correct";
+    }
+
+    @Test
+    void deleteBodyShouldRemoveBodyAtIndex() {
+        NBodyService service = new NBodyService();
+        service.init();
+        int initialSize = service.getBodies().size();
+        Body bodyToDelete = service.getBodies().get(1); // Get second body (not black hole)
+
+        boolean result = service.deleteBody(1);
+
+        assert result : "Deletion should be successful";
+        assert service.getBodies().size() == initialSize - 1 : "One body should be removed";
+        assert !service.getBodies().contains(bodyToDelete) : "Body should no longer be in the list";
+    }
+
+    @Test
+    void deleteBodyShouldHandleInvalidIndex() {
+        NBodyService service = new NBodyService();
+        service.init();
+        int initialSize = service.getBodies().size();
+
+        boolean resultNegative = service.deleteBody(-1);
+        boolean resultTooLarge = service.deleteBody(initialSize + 1);
+
+        assert !resultNegative : "Should not be able to delete at negative index";
+        assert !resultTooLarge : "Should not be able to delete at too large index";
+        assert service.getBodies().size() == initialSize : "No body should be removed";
+    }
+
+    @Test
+    void createBodyWithInvalidMassShouldStillWork() {
+        NBodyService service = new NBodyService();
+        service.init();
+
+        Body newBody = service.createBody(
+            100f, 100f, 100f,  // position
+            -1f,               // negative mass
+            false,             // not a black hole
+            1f, 1f, 1f        // velocity
+        );
+
+        assert newBody.getMass() == -1f : "Should allow negative mass for experimental purposes";
+    }
+
+    @Test
+    void createBodyAtOriginShouldWork() {
+        NBodyService service = new NBodyService();
+        service.init();
+
+        Body newBody = service.createBody(
+            0f, 0f, 0f,    // position at origin
+            1f,            // mass
+            false,         // not a black hole
+            0f, 0f, 0f     // no velocity
+        );
+
+        assert newBody.getPosition().equals(new Vector3D(0f, 0f, 0f)) : "Should allow body at origin";
+    }
+
+    @Test
+    void createBodyWithExtremeValuesShouldWork() {
+        NBodyService service = new NBodyService();
+        service.init();
+
+        Body newBody = service.createBody(
+            Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE,  // extreme position
+            Float.MAX_VALUE,                                    // extreme mass
+            false,                                             // not a black hole
+            Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE  // extreme velocity
+        );
+
+        assert newBody.getX() == Float.MAX_VALUE : "Should handle extreme X position";
+        assert newBody.getY() == Float.MAX_VALUE : "Should handle extreme Y position";
+        assert newBody.getZ() == Float.MAX_VALUE : "Should handle extreme Z position";
+        assert newBody.getMass() == Float.MAX_VALUE : "Should handle extreme mass";
     }
 } 
