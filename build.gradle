@@ -67,10 +67,32 @@ subprojects {
         dependsOn tasks.named('compileQuarkusGeneratedSourcesJava')
     }
 
+    jacocoTestCoverageVerification {
+        violationRules {
+            rule {
+                element = 'BUNDLE'
+                limit {
+                    counter = 'INSTRUCTION'
+                    value = 'COVEREDRATIO'
+                    minimum = 0.50
+                }
+            }
+        }
+    }
+
     test {
         finalizedBy jacocoTestReport
     }
+
+    check {
+        dependsOn jacocoTestCoverageVerification
+    }
+
+    tasks.named('jacocoTestCoverageVerification') {
+        dependsOn tasks.named('compileQuarkusGeneratedSourcesJava')
+    }
 }
+
 
 project(':core') {}
 project(':gateway') {}
