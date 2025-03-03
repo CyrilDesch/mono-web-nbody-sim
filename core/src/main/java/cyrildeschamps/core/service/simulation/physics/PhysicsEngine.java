@@ -14,12 +14,17 @@ public class PhysicsEngine {
     }
 
     public void calculateGravitationalForces(List<Body> bodies) {
-        Body blackHole = bodies.getFirst();
         bodies.forEach(Body::resetForce);
         
+        // Pour chaque corps non trou noir
         bodies.stream()
               .filter(b -> !b.isBlackHole())
-              .forEach(b -> b.addForce(blackHole));
+              .forEach(body -> {
+                  // Appliquer la force de tous les trous noirs
+                  bodies.stream()
+                        .filter(Body::isBlackHole)
+                        .forEach(blackHole -> body.addForce(blackHole));
+              });
     }
 
     public void updateVelocities(List<Body> bodies) {

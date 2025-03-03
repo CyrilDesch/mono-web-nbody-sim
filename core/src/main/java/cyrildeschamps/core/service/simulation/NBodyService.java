@@ -14,7 +14,7 @@ import java.util.Random;
 @ApplicationScoped
 public class NBodyService {
     protected static final int UPDATE_DELAY_MS = 15; // ~60 FPS
-    protected static final int NB_PARTICLES = 1500;
+    protected static final int NB_PARTICLES = 500;
     protected static final float BLACK_HOLE_MASS = 5e5F;
     protected static final float R_MIN = 50;
     protected static final float R_MAX = 300;
@@ -81,14 +81,64 @@ public class NBodyService {
             physicsEngine.calculateGravitationalForces(bodies);
             physicsEngine.updateVelocities(bodies);
             
-            // Keep black hole at center
-            Body blackHole = bodies.getFirst();
-            blackHole.setPosition(new Vector3D());
-            blackHole.setVelocity(new Vector3D());
+            // Keep black hole at center if it exists
+            bodies.stream()
+                .filter(Body::isBlackHole)
+                .findFirst()
+                .ifPresent(blackHole -> {
+                    blackHole.setPosition(new Vector3D());
+                    blackHole.setVelocity(new Vector3D());
+                });
         }
     }
 
     public void stopSimulation() {
         running = false;
+    }
+
+    /**
+     * Crée et ajoute un nouveau corps à la simulation
+     * @param x Position x initiale
+     * @param y Position y initiale
+     * @param z Position z initiale
+     * @param mass Masse du corps
+     * @param blackHole Si c'est un trou noir
+     * @param vx Vitesse initiale en x
+     * @param vy Vitesse initiale en y
+     * @param vz Vitesse initiale en z
+     * @return Le corps créé
+     */
+    public Body createBody(float x, float y, float z, float mass, boolean blackHole, float vx, float vy, float vz) {
+        synchronized (bodies) {
+            Body body = new Body();
+            body.setPosition(new Vector3D(x, y, z));
+            body.setVelocity(new Vector3D(vx, vy, vz));
+            body.setMass(mass);
+            body.setBlackHole(blackHole);
+            bodies.add(body);
+            return body;
+        }
+    }
+
+    /**
+     * Supprime un corps de la simulation à l'index spécifié
+     * @param index L'index du corps à supprimer
+     * @return true si le corps a été supprimé, false sinon
+     */
+    public boolean deleteBody(int index) {
+        synchronized (bodies) {
+            if (index < 0 || index >= bodies.size()) {
+                return false;
+            }
+            bodies.remove(index);
+            return true;
+        }
+    }
+
+    public void resetSimulation() {
+        synchronized (bodies) {
+            bodies.clear();
+            initBodies();
+        }
     }
 }

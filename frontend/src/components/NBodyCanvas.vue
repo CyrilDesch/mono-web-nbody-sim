@@ -1,5 +1,5 @@
 <template>
-  <canvas ref="canvas"></canvas>
+  <canvas ref="canvas" data-v-usewebsocket></canvas>
 </template>
 
 <script setup lang="ts">
@@ -70,6 +70,64 @@ onMounted(() => {
   const glowLayer = new BABYLON.GlowLayer("glow", scene);
   glowLayer.intensity = 0.5;
 
+  // Créer un shader personnalisé pour l'effet de distorsion du trou noir
+  BABYLON.Effect.ShadersStore["blackHoleVertexShader"] = `
+    precision highp float;
+    attribute vec3 position;
+    attribute vec2 uv;
+    uniform mat4 world;
+    uniform mat4 viewProjection;
+    varying vec2 vUV;
+    void main(void) {
+      gl_Position = viewProjection * world * vec4(position, 1.0);
+      vUV = uv;
+    }
+  `;
+
+  BABYLON.Effect.ShadersStore["blackHoleFragmentShader"] = `
+    precision highp float;
+    varying vec2 vUV;
+    uniform float time;
+    uniform vec3 accretionColor;
+    
+    void main(void) {
+      vec2 center = vec2(0.5, 0.5);
+      float dist = distance(vUV, center);
+      
+      // Effet de distorsion de la lumière
+      float blackHoleRadius = 0.2;
+      float accretionDiskRadius = 0.45;
+      float outerGlowRadius = 0.7;
+      
+      if (dist < blackHoleRadius) {
+        // Centre noir du trou noir avec un contour plus lumineux
+        float edgeGlow = smoothstep(blackHoleRadius - 0.1, blackHoleRadius, dist);
+        vec3 edgeColor = vec3(0.4, 0.2, 0.6);  // Violet plus lumineux
+        gl_FragColor = vec4(edgeColor * edgeGlow * 2.0, 1.0);
+      } else if (dist < accretionDiskRadius) {
+        // Disque d'accrétion avec effet de rotation
+        float angle = atan(vUV.y - 0.5, vUV.x - 0.5);
+        float spiral = sin(angle * 6.0 + time * 2.0);
+        float brightness = smoothstep(blackHoleRadius, accretionDiskRadius, dist);
+        brightness *= (1.0 + spiral * 0.7);
+        
+        // Couleurs plus intenses pour le disque d'accrétion
+        vec3 innerColor = vec3(1.0, 0.7, 0.2);  // Orange doré
+        vec3 outerColor = vec3(1.0, 0.3, 1.0);  // Rose vif
+        vec3 diskColor = mix(innerColor, outerColor, brightness);
+        
+        gl_FragColor = vec4(diskColor * brightness * 2.0, 1.0);
+      } else if (dist < outerGlowRadius) {
+        // Effet de distorsion lumineux autour du trou noir
+        float glow = smoothstep(outerGlowRadius, accretionDiskRadius, dist);
+        vec3 glowColor = vec3(0.7, 0.3, 0.7) * glow;
+        gl_FragColor = vec4(glowColor, glow);
+      } else {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+      }
+    }
+  `;
+
   // Boucle de rendu
   engine.runRenderLoop(() => {
     scene.render();
@@ -103,81 +161,114 @@ watch(bodies, (newBodies) => {
   // 1) Si on a plus de Mesh que de bodies, on en supprime
   while (spheres.length > newBodies.length) {
     const sphere = spheres.pop();
-    sphere?.dispose();
+    if (sphere) {
+      sphere.material?.dispose();
+      sphere.dispose();
+    }
   }
 
   // 2) For each body, either update existing sphere or create a new one
   newBodies.forEach((body: any, index: number) => {
-    // Diameter = body.radius (e.g.) or default 4.0
-    const diameter = body.radius || 4.0;
+    const diameter = body.blackHole ? 20.0 : 4.0;
 
-    if (spheres[index]) {
-      // -- Update existing sphere --
+    if (index < spheres.length) {
+      // Update existing sphere
       const sphere = spheres[index];
-
-      // Position
       sphere.position.set(
         body.x * scaleFactor,
         body.y * scaleFactor,
         body.z * scaleFactor
       );
 
-      // If you want to update size dynamically:
-      // Reset scale then recalculate it
-      const currentBoundingSize =
-        sphere.getBoundingInfo().boundingBox.maximum.x * 2;
+      const currentBoundingSize = sphere.getBoundingInfo().boundingBox.maximum.x * 2;
       if (currentBoundingSize !== 0) {
         const scaleFactorSphere = diameter / currentBoundingSize;
-        sphere.scaling.set(
-          scaleFactorSphere,
-          scaleFactorSphere,
-          scaleFactorSphere
-        );
+        sphere.scaling.set(scaleFactorSphere, scaleFactorSphere, scaleFactorSphere);
       }
 
-      // Optional: update material (color, etc.) if needed
       if (body.blackHole) {
-        (sphere.material as BABYLON.PBRMetallicRoughnessMaterial).baseColor =
-          new BABYLON.Color3(0, 0, 0);
-      } else {
-        // ...
-      }
-    } else {
-      // -- Create new sphere --
-      const sphere = BABYLON.MeshBuilder.CreateSphere(
-        "sphere",
-        { diameter, segments: 16 },
-        scene
-      );
-      sphere.position.set(
-        body.x * scaleFactor,
-        body.y * scaleFactor,
-        body.z * scaleFactor
-      );
-
-      // PBR Material
-      const material = new BABYLON.PBRMetallicRoughnessMaterial(
-        "material",
-        scene
-      );
-      if (body.blackHole) {
-        material.baseColor = new BABYLON.Color3(0, 0, 0); // Trou noir
-        material.metallic = 1.0;
-        material.roughness = 0.0;
-        material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-      } else {
+        // Mise à jour du matériau du trou noir si ce n'est pas déjà un shader material
+        if (!(sphere.material instanceof BABYLON.ShaderMaterial)) {
+          sphere.material?.dispose();
+          const shaderMaterial = new BABYLON.ShaderMaterial(
+            "blackHole",
+            scene,
+            {
+              vertex: "blackHole",
+              fragment: "blackHole",
+            },
+            {
+              attributes: ["position", "uv"],
+              uniforms: ["world", "viewProjection", "time", "accretionColor"],
+              needAlphaBlending: true
+            }
+          );
+          shaderMaterial.setVector3("accretionColor", new BABYLON.Vector3(1.0, 0.5, 0.0));
+          shaderMaterial.backFaceCulling = false;
+          sphere.material = shaderMaterial;
+        }
+        // Mise à jour du temps pour l'animation
+        (sphere.material as BABYLON.ShaderMaterial).setFloat("time", performance.now() / 1000.0);
+      } else if (sphere.material instanceof BABYLON.ShaderMaterial) {
+        // Si c'était un trou noir et ne l'est plus, changer le matériau
+        sphere.material.dispose();
+        const material = new BABYLON.PBRMetallicRoughnessMaterial("material", scene);
         material.baseColor = new BABYLON.Color3(
           Math.random(),
           Math.random(),
           Math.random()
         );
-        material.metallic = 1.0;
+        material.metallic = 0.8;
         material.roughness = 0.3;
-        material.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.8);
+        material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.3);
+        material.emissiveIntensity = 0.2;
+        sphere.material = material;
       }
-      sphere.material = material;
+    } else {
+      // Create new sphere
+      const sphere = BABYLON.MeshBuilder.CreateSphere(
+        "sphere",
+        { diameter, segments: 32 },
+        scene
+      );
+      sphere.position.set(
+        body.x * scaleFactor,
+        body.y * scaleFactor,
+        body.z * scaleFactor
+      );
 
-      // Store the new sphere
+      if (body.blackHole) {
+        const shaderMaterial = new BABYLON.ShaderMaterial(
+          "blackHole",
+          scene,
+          {
+            vertex: "blackHole",
+            fragment: "blackHole",
+          },
+          {
+            attributes: ["position", "uv"],
+            uniforms: ["world", "viewProjection", "time", "accretionColor"],
+            needAlphaBlending: true
+          }
+        );
+        shaderMaterial.setFloat("time", performance.now() / 1000.0);
+        shaderMaterial.setVector3("accretionColor", new BABYLON.Vector3(1.0, 0.5, 0.0));
+        shaderMaterial.backFaceCulling = false;
+        sphere.material = shaderMaterial;
+      } else {
+        const material = new BABYLON.PBRMetallicRoughnessMaterial("material", scene);
+        material.baseColor = new BABYLON.Color3(
+          Math.random(),
+          Math.random(),
+          Math.random()
+        );
+        material.metallic = 0.8;
+        material.roughness = 0.3;
+        material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.3);
+        material.emissiveIntensity = 0.2;
+        sphere.material = material;
+      }
+
       spheres.push(sphere);
     }
   });

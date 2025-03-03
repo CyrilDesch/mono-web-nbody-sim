@@ -15,7 +15,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @QuarkusTest
@@ -95,5 +95,31 @@ class NBodySessionManagerTest {
 
         // Then - Should only have messages from the second subscription
         verify(basicRemote, atLeastOnce()).sendText(anyString());
+    }
+
+    @Test
+    void deleteBodyShouldDelegateToService() {
+        // Given
+        when(nBodyService.deleteBody(anyInt())).thenReturn(true);
+
+        // When
+        boolean result = sessionManager.deleteBody(1);
+
+        // Then
+        verify(nBodyService).deleteBody(1);
+        assert result : "Should return the result from the service";
+    }
+
+    @Test
+    void deleteBodyShouldHandleFailure() {
+        // Given
+        when(nBodyService.deleteBody(anyInt())).thenReturn(false);
+
+        // When
+        boolean result = sessionManager.deleteBody(1);
+
+        // Then
+        verify(nBodyService).deleteBody(1);
+        assert !result : "Should return false when service fails to delete";
     }
 } 
