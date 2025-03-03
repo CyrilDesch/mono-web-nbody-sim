@@ -13,16 +13,16 @@ import java.util.Random;
 
 @ApplicationScoped
 public class NBodyService {
-    private static final int UPDATE_DELAY_MS = 15; // ~60 FPS
-    private static final int NB_PARTICLES = 1500;
-    private static final float BLACK_HOLE_MASS = 5e5F;
-    private static final float R_MIN = 50;
-    private static final float R_MAX = 300;
+    protected static final int UPDATE_DELAY_MS = 15; // ~60 FPS
+    protected static final int NB_PARTICLES = 1500;
+    protected static final float BLACK_HOLE_MASS = 5e5F;
+    protected static final float R_MIN = 50;
+    protected static final float R_MAX = 300;
 
     @Getter
     private final List<Body> bodies = Collections.synchronizedList(new ArrayList<>());
     private final PhysicsEngine physicsEngine = new PhysicsEngine();
-    private volatile boolean running = true;
+    volatile boolean running = true;
 
     @PostConstruct
     void init() {
@@ -30,7 +30,7 @@ public class NBodyService {
         startSimulationLoop();
     }
 
-    private void initBodies() {
+    void initBodies() {
         // Initialize black hole
         Body blackHole = new Body();
         blackHole.setMass(BLACK_HOLE_MASS);
@@ -75,7 +75,7 @@ public class NBodyService {
         }, "NBodySimulationThread").start();
     }
 
-    private void updateSimulation() {
+    void updateSimulation() {
         synchronized (bodies) {
             physicsEngine.updatePositions(bodies);
             physicsEngine.calculateGravitationalForces(bodies);
