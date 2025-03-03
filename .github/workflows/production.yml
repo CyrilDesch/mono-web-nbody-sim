@@ -35,27 +35,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-      
-      - name: Generate version tag
-        id: create_tag
-        run: |
-          # Générer un tag basé sur la date et l'heure
-          TAG_DATE=$(date +'%Y.%m.%d')
-          BUILD_NUMBER=${{ github.run_number }}
-          VERSION_TAG="v${TAG_DATE}-${BUILD_NUMBER}"
-          
-          # Configure Git
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          
-          # Créer et pousser le tag
-          git tag -a "${VERSION_TAG}" -m "Release ${VERSION_TAG} - Automated release by GitHub Actions"
-          git push origin "${VERSION_TAG}"
-          
-          # Enregistrer le tag pour l'étape suivante
-          echo "tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
-          echo "::notice::Created new tag: ${VERSION_TAG}"
-  
+
   create-release:
     needs: deploy-to-production
     runs-on: ubuntu-latest
