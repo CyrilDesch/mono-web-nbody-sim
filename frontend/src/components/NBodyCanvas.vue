@@ -221,7 +221,7 @@ watch(bodies, (newBodies) => {
         material.metallic = 0.8;
         material.roughness = 0.3;
         material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.3);
-        material.emissiveIntensity = 0.2;
+        material._emissiveIntensity = 0.2;
         sphere.material = material;
       }
     } else {
@@ -265,7 +265,7 @@ watch(bodies, (newBodies) => {
         material.metallic = 0.8;
         material.roughness = 0.3;
         material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.3);
-        material.emissiveIntensity = 0.2;
+        material._emissiveIntensity = 0.2;
         sphere.material = material;
       }
 

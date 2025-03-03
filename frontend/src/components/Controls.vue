@@ -75,16 +75,6 @@ function onBlackHoleChange() {
   }
 }
 
-function resetForm() {
-  Object.assign(newBody, defaultBody);
-  numBodies.value = 10;
-  positionRange.value = 100;
-}
-
-function generateRandomNumber(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
-}
-
 function generateBodies() {
   const bodyToSend = {
     type: 'createBodies',
