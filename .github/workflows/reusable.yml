@@ -25,7 +25,7 @@ on:
         default: false
 
 jobs:
-  build-and-test:
+  build-test-and-package:
     runs-on: ubuntu-latest
     
     steps:
@@ -42,13 +42,38 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
+        with:
+          gradle-home-cache-cleanup: true
       
-      - name: Build and Test
-        run: ./gradlew build test
+      # Setup Node.js and Yarn cache if frontend build is needed
+      - name: Setup Node.js
+        if: ${{ inputs.build_frontend }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: './frontend/yarn.lock'
+
+      # Install frontend dependencies early to parallelize with backend build
+      - name: Install Frontend Dependencies
+        if: ${{ inputs.build_frontend }}
+        working-directory: ./frontend
+        run: yarn install --frozen-lockfile
       
-      - name: Code Coverage with JaCoCo
-        if: ${{ inputs.jacoco_report }}
-        run: ./gradlew jacocoTestReport
+      # Combined build, test and package step
+      - name: Build, Test and Package
+        run: |
+          if [[ "${{ inputs.production_build }}" == "true" ]]; then
+            ./gradlew build test assemble jacocoTestReport -Pprod
+          else
+            ./gradlew build test assemble jacocoTestReport
+          fi
+      
+      # Build frontend in parallel with test report processing
+      - name: Build Frontend
+        if: ${{ inputs.build_frontend }}
+        working-directory: ./frontend
+        run: yarn build
       
       - name: Generate Badge for Test Coverage
         if: ${{ inputs.jacoco_report }}
@@ -67,41 +92,8 @@ jobs:
             **/build/reports/jacoco/
             **/build/reports/tests/
             .github/badges/
-
-  build-artifacts:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: ${{ always() && !cancelled() && needs.build-and-test.result == 'success' }}
-    
-    steps:
-      - uses: actions/checkout@v3
       
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-      
-      - name: Build JAR files
-        run: |
-          if [[ "${{ inputs.production_build }}" == "true" ]]; then
-            ./gradlew assemble -Pprod
-          else
-            ./gradlew assemble
-          fi
-      
-      - name: Build Frontend
-        if: ${{ inputs.build_frontend }}
-        working-directory: ./frontend
-        run: |
-          yarn install --frozen-lockfile
-          yarn build
-      
-      - name: Upload Artifacts
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
