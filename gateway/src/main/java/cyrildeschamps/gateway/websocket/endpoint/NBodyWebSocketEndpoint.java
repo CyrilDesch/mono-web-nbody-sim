@@ -2,7 +2,10 @@ package cyrildeschamps.gateway.websocket.endpoint;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cyrildeschamps.gateway.websocket.manager.NBodySessionManager;
+import cyrildeschamps.gateway.websocket.messages.CreateBodiesMessage;
+import cyrildeschamps.gateway.websocket.messages.DeleteBodyMessage;
 import cyrildeschamps.gateway.websocket.messages.FpsMessage;
+import cyrildeschamps.gateway.websocket.messages.ResetSimulationMessage;
 import cyrildeschamps.gateway.websocket.messages.WebSocketMessage;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -40,10 +43,16 @@ public class NBodyWebSocketEndpoint {
     public void onMessage(String message, Session session) {
         try {
             WebSocketMessage wsMessage = objectMapper.readValue(message, WebSocketMessage.class);
-            if (wsMessage instanceof FpsMessage fpsMessage) {
-                sessionManager.subscribe(session, fpsMessage.getFps());
-            } else {
-                log.warn("Type de message non supporté : {}", wsMessage.getClass().getSimpleName());
+            switch (wsMessage) {
+                case FpsMessage fpsMessage -> sessionManager.subscribe(session, fpsMessage.getFps());
+                case CreateBodiesMessage createMessage -> sessionManager.createBodies(
+                    createMessage.getCount(),
+                    createMessage.getRange(),
+                    createMessage.isBlackHole()
+                );
+                case DeleteBodyMessage deleteMessage -> sessionManager.deleteBody(deleteMessage.getIndex());
+                case ResetSimulationMessage resetMessage -> sessionManager.resetSimulation();
+                default -> log.warn("Type de message non supporté : {}", wsMessage.getClass().getSimpleName());
             }
         } catch (Exception e) {
             log.error("Erreur lors du traitement du message sur la session {} : {}", session.getId(), e.getMessage());
